@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  vaani-rag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
+      - SARVAM_STT_MODEL=saaras:v3
+      - SARVAM_CHAT_MODEL=sarvam-105b-conversations
+      - EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      - DATASET_NAME=ai4bharat/MSMARCO-XI
+      - DATASET_LIMIT=10000
+      - TOP_K=10
+      - FINAL_K=5
+      - SEMANTIC_WEIGHT=0.7
+      - BM25_WEIGHT=0.3
+      - RETRIEVAL_THRESHOLD=0.35
+    volumes:
+      - ./backend/data:/app/backend/data
+      - ./backend/index:/app/backend/index
+    restart: unless-stopped

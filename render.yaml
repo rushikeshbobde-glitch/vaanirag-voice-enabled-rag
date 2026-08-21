@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: vaanirag-backend
+    env: python
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: EMBEDDING_MODEL
+        value: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      - key: DATASET_NAME
+        value: ai4bharat/MSMARCO-XI
+      - key: DATASET_LIMIT
+        value: 10000
+      - key: TOP_K
+        value: 10
+      - key: FINAL_K
+        value: 5
+      - key: SEMANTIC_WEIGHT
+        value: 0.7
+      - key: BM25_WEIGHT
+        value: 0.3
+      - key: RETRIEVAL_THRESHOLD
+        value: 0.28
