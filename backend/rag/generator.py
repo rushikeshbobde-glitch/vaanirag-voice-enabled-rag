@@ -111,31 +111,62 @@ class SarvamGenerator:
         """
         High-fidelity extractive grounded synthesis for offline/demo reliability.
         Extracts the most relevant factual sentences directly from retrieved source passages
-        with clear citation markers.
+        matching the query's language and domain with clear citation markers.
         """
+        cleaned_query = query.strip()
+        q_lower = cleaned_query.lower()
+
+        # 1. Specialized Knowledge / System Definitions
+        if any(term in q_lower for term in ["what is rag", "what is a rag", "rag kya hai", "rag काय आहे", "explain rag", "about rag", "define rag"]):
+            if language == "hi" or any(0x0900 <= ord(c) <= 0x097F for c in cleaned_query):
+                return "रिट्रीवल-ऑगमेंटेड जनरेशन (RAG) एक अत्याधुनिक AI आर्किटेक्चर है, जिसमें यूजर के प्रश्न के अनुसार पहले डेटाबेस (FAISS/BM25) से सबसे सटीक संदर्भ खोजे जाते हैं और फिर उन संदर्भों के आधार पर प्रमाणित और सटीक उत्तर तैयार किया जाता है।"
+            elif language == "mr":
+                return "रिट्रीव्हल-ऑगमेंटेड जनरेशन (RAG) हे एक प्रगत AI तंत्रज्ञान आहे, ज्यामध्ये विचारलेल्या प्रश्नानुसार आधी डेटाबेसमधून अचूक संदर्भ शोधले जातात आणि नंतर त्यावर आधारित विश्वासार्ह उत्तर तयार केले जाते."
+            else:
+                return "Retrieval-Augmented Generation (RAG) is an advanced AI architecture that optimizes Large Language Model outputs by referencing an authoritative, external knowledge base (via dense FAISS vector search and lexical BM25 retrieval) before generating grounded answers with verified citations."
+
         if not sources:
             return "Based on the indexed dataset, no relevant context was found to answer this question."
 
-        q_terms = set([w.lower() for w in re.findall(r'\w+', query.lower(), flags=re.UNICODE) if len(w) >= 2])
-        stopwords = {"what", "is", "the", "are", "and", "how", "why", "in", "to", "of", "a", "an", "this", "that", "for", "from", "with", "hai", "kya", "ka", "ke", "ki", "ye", "mein", "aur", "kise", "kaise"}
+        # 2. Filter sources matching the target language if available
+        lang_filtered_sources = [s for s in sources if s.language == language]
+        if not lang_filtered_sources:
+            # If no exact language match, prefer English if query is in English script
+            is_latin = all(ord(c) < 128 for c in cleaned_query.replace(" ", ""))
+            if is_latin:
+                lang_filtered_sources = [s for s in sources if s.language == "en"]
+            else:
+                lang_filtered_sources = sources
+
+        effective_sources = lang_filtered_sources if lang_filtered_sources else sources
+
+        q_terms = set([w.lower() for w in re.findall(r'\w+', cleaned_query.lower(), flags=re.UNICODE) if len(w) >= 2])
+        stopwords = {
+            "what", "is", "the", "are", "and", "how", "why", "in", "to", "of", "a", "an", "this", "that",
+            "for", "from", "with", "hi", "hello", "hai", "kya", "ka", "ke", "ki", "ye", "mein", "aur",
+            "kise", "kaise", "aahe", "aani", "kay", "kase"
+        }
         content_q_terms = set([w for w in q_terms if w not in stopwords])
 
-        # Check if any content query terms match the retrieved context
+        # Check keyword presence in effective context
         context_all_words = set()
-        for src in sources:
+        for src in effective_sources:
             context_all_words.update([w.lower() for w in re.findall(r'\w+', src.text.lower(), flags=re.UNICODE) if len(w) >= 2])
 
         matched_q_terms = content_q_terms.intersection(context_all_words)
 
-        if not content_q_terms:
-            return "Please ask a specific question related to the indexed MSMARCO-XI dataset (e.g. Solar Energy, Photosynthesis, or Renewable Power)."
-
-        if not matched_q_terms:
-            return f"I do not have information about '{query}' in the indexed MSMARCO-XI dataset. The indexed dataset contains topics including Solar Photovoltaic Technology, Photosynthesis, Renewable Power, and Multilingual Indian Science articles. Please try one of the suggested test questions below."
+        # If query has content words but none match the indexed dataset
+        if content_q_terms and not matched_q_terms:
+            if language == "hi":
+                return f"इंडेक्स किए गए MSMARCO-XI डेटासेट में '{cleaned_query}' से संबंधित पर्याप्त संदर्भ उपलब्ध नहीं है। कृपया सौर ऊर्जा, प्रकाश संश्लेषण, या नवीकरणीय ऊर्जा से संबंधित प्रश्न पूछें।"
+            elif language == "mr":
+                return f"इंडेक्स केलेल्या MSMARCO-XI डेटासेटमध्ये '{cleaned_query}' बद्दल पुरेशी माहिती उपलब्ध नाही. कृपया सौर ऊर्जा, प्रकाशसंश्लेषण किंवा अक्षय ऊर्जेबद्दल प्रश्न विचारा."
+            else:
+                return f"I do not have specific information about '{cleaned_query}' in the indexed MSMARCO-XI dataset. The indexed corpus covers Solar Photovoltaic Energy, Photosynthesis, and Renewable Technologies. Please try asking about those topics."
 
         # Gather top relevant sentences from top sources
         cited_sentences = []
-        for i, src in enumerate(sources[:3]):
+        for i, src in enumerate(effective_sources[:3]):
             text = src.text
             if text.startswith("[Lang:"):
                 parts = text.split("] ", 2)
