@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sliders, Layers, Zap, Globe, Key, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import type { ChunkStrategy } from '../types/rag';
-import { ragApi, getApiBase } from '../services/api';
+import { ragApi, DEFAULT_PRODUCTION_BACKEND, getApiBase } from '../services/api';
 
 interface SettingsViewProps {
   chunkStrategy: ChunkStrategy;
@@ -52,14 +52,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   rerankEnabled,
   setRerankEnabled,
 }) => {
-  const [backendUrl, setBackendUrl] = useState<string>('');
+  const [backendUrl, setBackendUrl] = useState<string>(DEFAULT_PRODUCTION_BACKEND);
   const [connectionStatus, setConnectionStatus] = useState<'IDLE' | 'TESTING' | 'CONNECTED' | 'ERROR'>('IDLE');
   const [connectionMsg, setConnectionMsg] = useState<string>('');
   const [apiKeyInput, setApiKeyInput] = useState<string>('');
   const [apiKeyStatus, setApiKeyStatus] = useState<string>('');
 
   useEffect(() => {
-    const saved = localStorage.getItem('vaanirag_backend_url') || (import.meta as any).env?.VITE_API_BASE_URL || '';
+    const saved = localStorage.getItem('vaanirag_backend_url') || (import.meta as any).env?.VITE_API_BASE_URL || DEFAULT_PRODUCTION_BACKEND;
     setBackendUrl(saved);
   }, []);
 

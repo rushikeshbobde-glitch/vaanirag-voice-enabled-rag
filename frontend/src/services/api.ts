@@ -6,6 +6,8 @@ import type {
   SystemStatus,
 } from '../types/rag';
 
+export const DEFAULT_PRODUCTION_BACKEND = 'https://vaanirag-voice-enabled-rag-2.onrender.com';
+
 export const getApiBase = (): string => {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('vaanirag_backend_url');
@@ -13,8 +15,15 @@ export const getApiBase = (): string => {
       return `${custom.trim().replace(/\/+$/, '')}/api`;
     }
   }
-  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL || '';
-  return envUrl ? `${envUrl.replace(/\/+$/, '')}/api` : '/api';
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envUrl && envUrl.trim()) {
+    return `${envUrl.trim().replace(/\/+$/, '')}/api`;
+  }
+  // On cloud deployments (Netlify/Vercel), default permanently to live Render backend
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `${DEFAULT_PRODUCTION_BACKEND}/api`;
+  }
+  return '/api';
 };
 
 export const ragApi = {
@@ -24,14 +33,19 @@ export const ragApi = {
       const custom = localStorage.getItem('vaanirag_backend_url');
       if (custom && custom.trim()) return custom.trim();
     }
-    return (import.meta as any).env?.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    if (envUrl && envUrl.trim()) return envUrl.trim();
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return DEFAULT_PRODUCTION_BACKEND;
+    }
+    return typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8000';
   },
 
   // Set custom backend URL
   setBackendUrl: (url: string) => {
     if (typeof window !== 'undefined') {
-      if (!url || !url.trim()) {
-        localStorage.removeItem('vaanirag_backend_url');
+      if (!url || !url.trim() || url.trim() === DEFAULT_PRODUCTION_BACKEND) {
+        localStorage.setItem('vaanirag_backend_url', DEFAULT_PRODUCTION_BACKEND);
       } else {
         localStorage.setItem('vaanirag_backend_url', url.trim());
       }
