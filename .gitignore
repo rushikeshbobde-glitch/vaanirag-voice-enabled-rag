@@ -30,12 +30,10 @@ wheels/
 *.egg
 .pytest_cache/
 
-# Data & Indices
+# Data
 backend/data/raw/*.parquet
 backend/data/raw/*.arrow
 backend/data/raw/*.tar.gz
-backend/index/*.index
-backend/index/*.pkl
 
 # Frontend & Node
 node_modules/

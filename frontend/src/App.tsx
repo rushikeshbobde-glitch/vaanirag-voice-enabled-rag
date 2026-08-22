@@ -123,6 +123,23 @@ export function App() {
           {/* Tab 2: Main Voice RAG Workspace */}
           {activeTab === 'workspace' && (
             <div className="space-y-8 animate-in fade-in duration-300">
+              {!backendOnline && (
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-amber-300 text-xs sm:text-sm">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+                    <span>
+                      <strong>Backend Not Connected:</strong> If you are on Netlify, paste your live Render backend URL in <strong>Settings</strong> to connect.
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('settings')}
+                    className="ml-3 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-semibold whitespace-nowrap transition-colors"
+                  >
+                    Open Settings →
+                  </button>
+                </div>
+              )}
+
               <VoiceRecorder
                 onQuerySubmit={handleQuerySubmit}
                 isLoading={isLoading}
