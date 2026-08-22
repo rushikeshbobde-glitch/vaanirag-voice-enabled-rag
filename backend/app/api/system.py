@@ -90,15 +90,29 @@ async def trigger_index_build(
 @router.post("/index/reload")
 async def reload_index():
     """
-    Reloads FAISS index and metadata from disk without rebuilding.
+    Reloads FAISS index and metadata from disk without rebuilding and clears LRU cache.
     """
     retriever = get_retriever()
+    orchestrator = get_orchestrator()
+    orchestrator.query_cache.clear()
     success = retriever.load_index_if_exists()
     return {
         "status": "success" if success else "failed",
         "chunks_loaded": len(retriever.metadata),
         "is_ready": retriever.is_ready,
+        "cache_cleared": True,
     }
+
+
+@router.post("/system/clear-cache")
+async def clear_cache():
+    """
+    Clears the in-memory query and embedding cache.
+    """
+    orchestrator = get_orchestrator()
+    count = len(orchestrator.query_cache)
+    orchestrator.query_cache.clear()
+    return {"status": "success", "cleared_entries": count}
 
 
 @router.get("/sources/{request_id}")
