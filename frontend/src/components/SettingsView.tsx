@@ -1,6 +1,7 @@
-import React from 'react';
-import { Sliders, Layers, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sliders, Layers, Zap, Globe, Key, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import type { ChunkStrategy } from '../types/rag';
+import { ragApi, getApiBase } from '../services/api';
 
 interface SettingsViewProps {
   chunkStrategy: ChunkStrategy;
@@ -51,17 +52,106 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   rerankEnabled,
   setRerankEnabled,
 }) => {
+  const [backendUrl, setBackendUrl] = useState<string>('');
+  const [connectionStatus, setConnectionStatus] = useState<'IDLE' | 'TESTING' | 'CONNECTED' | 'ERROR'>('IDLE');
+  const [connectionMsg, setConnectionMsg] = useState<string>('');
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
+  const [apiKeyStatus, setApiKeyStatus] = useState<string>('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('vaanirag_backend_url') || (import.meta as any).env?.VITE_API_BASE_URL || '';
+    setBackendUrl(saved);
+  }, []);
+
+  const handleTestConnection = async () => {
+    setConnectionStatus('TESTING');
+    setConnectionMsg('Pinging backend /api/health...');
+    try {
+      ragApi.setBackendUrl(backendUrl);
+      const res = await ragApi.getHealth();
+      setConnectionStatus('CONNECTED');
+      setConnectionMsg(`Connected successfully to ${res.service || 'VaaniRAG Backend'} (v${res.version})!`);
+    } catch (err: any) {
+      setConnectionStatus('ERROR');
+      setConnectionMsg(`Connection failed: ${err.message || 'Unable to reach backend URL'}. Make sure your backend service is running.`);
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!apiKeyInput.trim()) return;
+    try {
+      setApiKeyStatus('Saving key to backend...');
+      await ragApi.updateApiKey(apiKeyInput.trim());
+      setApiKeyStatus('Sarvam AI API key saved and activated successfully!');
+    } catch (err: any) {
+      setApiKeyStatus(`Error saving key: ${err.message}`);
+    }
+  };
+
   return (
     <div className="glass-panel rounded-2xl p-6 sm:p-8 border border-slate-800/80 space-y-8 shadow-2xl">
       {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-100 flex items-center space-x-2">
           <Sliders className="w-5 h-5 text-indigo-400" />
-          <span>RAG Pipeline Configuration & Strategy Tuner</span>
+          <span>RAG Pipeline Configuration & Deployment Settings</span>
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Dynamically adjust chunking strategies, hybrid retrieval weights, and reranking parameters
+          Configure live backend endpoints, chunking strategies, hybrid weights, and Sarvam AI credentials
         </p>
+      </div>
+
+      {/* Live Backend Connection (Netlify / Vercel Integration) */}
+      <div className="p-5 rounded-xl bg-slate-950/70 border border-indigo-500/30 space-y-3 shadow-inner">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-200 flex items-center space-x-2">
+            <Globe className="w-4 h-4 text-cyan-400" />
+            <span>Backend Service URL (Netlify / Vercel Cloud Connection)</span>
+          </h3>
+          <span className="text-[11px] font-mono text-slate-400">
+            Active: {getApiBase()}
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-400 leading-relaxed">
+          If deployed on Netlify or Vercel, paste your live backend URL below (e.g. <code>https://vaanirag-backend.onrender.com</code> or <code>http://localhost:8000</code>).
+        </p>
+
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            value={backendUrl}
+            onChange={(e) => setBackendUrl(e.target.value)}
+            placeholder="e.g., https://vaanirag-backend.onrender.com or http://localhost:8000"
+            className="flex-1 bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
+          />
+          <button
+            onClick={handleTestConnection}
+            disabled={connectionStatus === 'TESTING'}
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+          >
+            {connectionStatus === 'TESTING' ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Globe className="w-3.5 h-3.5" />
+            )}
+            <span>{connectionStatus === 'TESTING' ? 'Testing...' : 'Test & Connect'}</span>
+          </button>
+        </div>
+
+        {connectionStatus === 'CONNECTED' && (
+          <div className="flex items-center space-x-2 p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-xs">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{connectionMsg}</span>
+          </div>
+        )}
+
+        {connectionStatus === 'ERROR' && (
+          <div className="flex items-center space-x-2 p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-300 text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{connectionMsg}</span>
+          </div>
+        )}
       </div>
 
       {/* Multi-Strategy Chunking Selection */}
@@ -162,6 +252,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             Enables term density scoring and language alignment filtering to optimize top candidates.
           </p>
         </div>
+      </div>
+
+      {/* Sarvam AI Key Configuration */}
+      <div className="p-5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+        <h3 className="text-sm font-bold text-slate-200 flex items-center space-x-2">
+          <Key className="w-4 h-4 text-emerald-400" />
+          <span>Sarvam AI Credentials (Optional)</span>
+        </h3>
+        <p className="text-xs text-slate-400">
+          Enter your Sarvam AI API key for Saaras v3 STT and 105B LLM generation. If left blank, high-accuracy local grounded synthesis is used.
+        </p>
+        <div className="flex items-center space-x-2">
+          <input
+            type="password"
+            value={apiKeyInput}
+            onChange={(e) => setApiKeyInput(e.target.value)}
+            placeholder="Paste your SARVAM_API_KEY here..."
+            className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+          />
+          <button
+            onClick={handleSaveApiKey}
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/20"
+          >
+            Save Key
+          </button>
+        </div>
+        {apiKeyStatus && (
+          <p className="text-xs text-emerald-300 font-medium">{apiKeyStatus}</p>
+        )}
       </div>
     </div>
   );

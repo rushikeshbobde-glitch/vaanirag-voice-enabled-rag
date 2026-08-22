@@ -6,20 +6,48 @@ import type {
   SystemStatus,
 } from '../types/rag';
 
-const BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || '';
-const API_BASE = BASE_URL ? `${BASE_URL.replace(/\/+$/, '')}/api` : '/api';
+export const getApiBase = (): string => {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('vaanirag_backend_url');
+    if (custom && custom.trim()) {
+      return `${custom.trim().replace(/\/+$/, '')}/api`;
+    }
+  }
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL || '';
+  return envUrl ? `${envUrl.replace(/\/+$/, '')}/api` : '/api';
+};
 
 export const ragApi = {
+  // Get active backend API URL
+  getBackendUrl: (): string => {
+    if (typeof window !== 'undefined') {
+      const custom = localStorage.getItem('vaanirag_backend_url');
+      if (custom && custom.trim()) return custom.trim();
+    }
+    return (import.meta as any).env?.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+  },
+
+  // Set custom backend URL
+  setBackendUrl: (url: string) => {
+    if (typeof window !== 'undefined') {
+      if (!url || !url.trim()) {
+        localStorage.removeItem('vaanirag_backend_url');
+      } else {
+        localStorage.setItem('vaanirag_backend_url', url.trim());
+      }
+    }
+  },
+
   // Health check
   getHealth: async (): Promise<{ status: string; service: string; version: string; event: string }> => {
-    const res = await fetch(`${API_BASE}/health`);
+    const res = await fetch(`${getApiBase()}/health`);
     if (!res.ok) throw new Error(`Health check failed: ${res.statusText}`);
     return res.json();
   },
 
   // Submit Text Query
   submitQuery: async (payload: TextQueryPayload): Promise<RAGResponse> => {
-    const res = await fetch(`${API_BASE}/rag/query`, {
+    const res = await fetch(`${getApiBase()}/rag/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -33,7 +61,7 @@ export const ragApi = {
 
   // Submit Voice Audio Base64 / Query
   submitVoiceQuery: async (payload: VoiceQueryPayload): Promise<RAGResponse> => {
-    const res = await fetch(`${API_BASE}/rag/voice-query`, {
+    const res = await fetch(`${getApiBase()}/rag/voice-query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -51,7 +79,7 @@ export const ragApi = {
     formData.append('file', audioBlob, 'recording.wav');
     formData.append('language', language);
 
-    const res = await fetch(`${API_BASE}/voice/transcribe`, {
+    const res = await fetch(`${getApiBase()}/voice/transcribe`, {
       method: 'POST',
       body: formData,
     });
@@ -62,47 +90,84 @@ export const ragApi = {
     return res.json();
   },
 
-  // Latency metrics
+  // Fetch latency statistics
+  getLatency: async () => {
+    const res = await fetch(`${getApiBase()}/latency`);
+    if (!res.ok) throw new Error('Failed to fetch latency statistics');
+    return res.json();
+  },
+
   getLatencyMetrics: async () => {
-    const res = await fetch(`${API_BASE}/latency`);
+    const res = await fetch(`${getApiBase()}/latency`);
     if (!res.ok) throw new Error('Failed to fetch latency metrics');
     return res.json();
   },
 
-  // Evaluation summary
+  // Run benchmark evaluation
+  runBenchmark: async (limit: number = 10): Promise<EvaluationSummary> => {
+    const res = await fetch(`${getApiBase()}/evaluation/run?limit=${limit}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Benchmark execution failed');
+    return res.json();
+  },
+
+  runEvaluation: async (limit: number = 10): Promise<EvaluationSummary> => {
+    const res = await fetch(`${getApiBase()}/evaluation/run?limit=${limit}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Evaluation execution failed');
+    return res.json();
+  },
+
+  // Get evaluation summary
   getEvaluationSummary: async (): Promise<EvaluationSummary> => {
-    const res = await fetch(`${API_BASE}/evaluation/summary`);
+    const res = await fetch(`${getApiBase()}/evaluation/summary`);
     if (!res.ok) throw new Error('Failed to fetch evaluation summary');
     return res.json();
   },
 
-  // Run benchmark evaluation
-  runEvaluation: async (sampleLimit: number = 15): Promise<EvaluationSummary> => {
-    const res = await fetch(`${API_BASE}/evaluation/run?sample_limit=${sampleLimit}`, {
-      method: 'POST',
-    });
-    if (!res.ok) throw new Error('Evaluation run failed');
-    return res.json();
-  },
-
-  // System status
+  // System Status
   getSystemStatus: async (): Promise<SystemStatus> => {
-    const res = await fetch(`${API_BASE}/system/status`);
+    const res = await fetch(`${getApiBase()}/system/status`);
     if (!res.ok) throw new Error('Failed to fetch system status');
     return res.json();
   },
 
-  // Reload index
+  // Reload Index
   reloadIndex: async () => {
-    const res = await fetch(`${API_BASE}/index/reload`, { method: 'POST' });
-    if (!res.ok) throw new Error('Failed to reload index');
+    const res = await fetch(`${getApiBase()}/index/reload`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Index reload failed');
     return res.json();
   },
 
-  // Rebuild index
+  // Rebuild Index
+  rebuildIndex: async (limit: number = 500) => {
+    const res = await fetch(`${getApiBase()}/index/build?limit=${limit}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Index rebuild failed');
+    return res.json();
+  },
+
   buildIndex: async (limit: number = 500) => {
-    const res = await fetch(`${API_BASE}/index/build?limit=${limit}`, { method: 'POST' });
-    if (!res.ok) throw new Error('Failed to build index');
+    const res = await fetch(`${getApiBase()}/index/build?limit=${limit}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Index build failed');
+    return res.json();
+  },
+
+  // Update Sarvam API Key
+  updateApiKey: async (apiKey: string) => {
+    const res = await fetch(`${getApiBase()}/system/api-key`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: apiKey }),
+    });
+    if (!res.ok) throw new Error('Failed to update API key');
     return res.json();
   },
 };

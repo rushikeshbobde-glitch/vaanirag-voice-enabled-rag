@@ -2,13 +2,13 @@ services:
   - type: web
     name: vaanirag-backend
     env: python
-    buildCommand: "cd backend && pip install -r requirements.txt"
-    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    buildCommand: "cd backend && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && pip install --no-cache-dir -r requirements.txt"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.8
       - key: EMBEDDING_MODEL
-        value: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+        value: sentence-transformers/all-MiniLM-L6-v2
       - key: DATASET_NAME
         value: ai4bharat/MSMARCO-XI
       - key: DATASET_LIMIT
@@ -23,3 +23,9 @@ services:
         value: 0.3
       - key: RETRIEVAL_THRESHOLD
         value: 0.28
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      - key: TORCH_NUM_THREADS
+        value: "1"

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
 # Load .env file
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     SARVAM_API_KEY: str = os.getenv("SARVAM_API_KEY", "")
     SARVAM_STT_MODEL: str = os.getenv("SARVAM_STT_MODEL", "saaras:v3")
     SARVAM_CHAT_MODEL: str = os.getenv("SARVAM_CHAT_MODEL", "sarvam-105b-conversations")
-    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     DATASET_NAME: str = os.getenv("DATASET_NAME", "ai4bharat/MSMARCO-XI")
     DATASET_LIMIT: int = int(os.getenv("DATASET_LIMIT", "10000"))
     TOP_K: int = int(os.getenv("TOP_K", "10"))
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     PROCESSED_DATA_DIR: Path = BASE_DIR / "data" / "processed"
     INDEX_DIR: Path = BASE_DIR / "index"
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

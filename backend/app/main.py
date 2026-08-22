@@ -1,20 +1,24 @@
 import os
 import sys
+import gc
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 
 # Add backend directory to sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE_DIR))
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 from app.dependencies import get_settings
 from app.api import health_router, rag_router, voice_router, evaluation_router, system_router
 from rag.retriever import get_retriever
 from rag.embeddings import load_embedding_model
-from scripts.build_index import build_full_index
 
 # Configure logging
 logging.basicConfig(
@@ -28,7 +32,7 @@ logger = logging.getLogger("vaani_rag")
 async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
-    Initializes models and verifies FAISS vector index readiness on server startup.
+    Initializes embedding model and loads FAISS vector index readiness on server startup.
     """
     settings = get_settings()
     logger.info("Initializing VaaniRAG: Multilingual Voice-Enabled Retrieval Intelligence...")
@@ -39,17 +43,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Error warming up embedding model: {e}")
 
-    # 2. Check and load or build index
+    # 2. Check and load pre-built index without automatic building on startup
     retriever = get_retriever()
     if not retriever.is_ready:
-        logger.info("No index found on startup. Automatically building initial index...")
-        try:
-            build_full_index(dataset_limit=500)
-            retriever.load_index_if_exists()
-        except Exception as e:
-            logger.error(f"Failed to build initial index on startup: {e}")
+        logger.info("Checking for pre-built FAISS index on disk...")
+        retriever.load_index_if_exists()
+        if not retriever.is_ready:
+            logger.warning(
+                "No pre-built index found on disk. Automatic startup indexing is disabled to conserve memory. "
+                "Trigger index build on-demand via POST /api/index/build or CLI (python scripts/build_index.py)."
+            )
 
-    logger.info(f"VaaniRAG Backend Online! Vector Index Ready: {retriever.is_ready} ({len(retriever.metadata)} chunks)")
+    gc.collect()
+
+    logger.info(
+        f"VaaniRAG Backend Online! Vector Index Ready: {retriever.is_ready} ({len(retriever.metadata)} chunks)"
+    )
     yield
     logger.info("VaaniRAG Backend shutting down...")
 
@@ -68,6 +77,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Mount API Routers under /api
@@ -77,43 +87,61 @@ app.include_router(voice_router, prefix="/api")
 app.include_router(evaluation_router, prefix="/api")
 app.include_router(system_router, prefix="/api")
 
+# Determine frontend static assets path
+FRONTEND_DIST_APP = Path("/app/frontend/dist")
+FRONTEND_DIST_LOCAL = BASE_DIR.parent / "frontend" / "dist"
+FRONTEND_DIST = FRONTEND_DIST_APP if FRONTEND_DIST_APP.exists() else FRONTEND_DIST_LOCAL
 
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+# Mount assets directory if available
+if FRONTEND_DIST.exists() and (FRONTEND_DIST / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
 
-# Serve built frontend in production if available
-FRONTEND_DIST = Path("/app/frontend/dist")
-if not FRONTEND_DIST.exists():
-    FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
 
-if FRONTEND_DIST.exists() and (FRONTEND_DIST / "index.html").exists():
-    if (FRONTEND_DIST / "assets").exists():
-        app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
-
-    @app.get("/")
-    async def serve_index():
-        return FileResponse(str(FRONTEND_DIST / "index.html"))
-
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        if full_path.startswith("api") or full_path.startswith("docs") or full_path == "openapi.json":
-            return {"detail": "Not found"}
-        target = FRONTEND_DIST / full_path
-        if target.exists() and target.is_file():
-            return FileResponse(str(target))
-        return FileResponse(str(FRONTEND_DIST / "index.html"))
-else:
-    @app.get("/")
-    async def root():
-        return {
+@app.get("/")
+async def root():
+    """
+    Root endpoint serving frontend index.html if built, or system metadata JSON.
+    """
+    index_file = FRONTEND_DIST / "index.html"
+    if FRONTEND_DIST.exists() and index_file.exists():
+        return FileResponse(str(index_file))
+    return JSONResponse(
+        {
             "name": "VaaniRAG",
             "subtitle": "Multilingual Voice-Enabled Retrieval Intelligence",
             "badge": "HH Goa 2026",
             "status": "online",
             "docs_url": "/docs",
         }
+    )
+
+
+@app.get("/{full_path:path}")
+async def serve_spa_routes(full_path: str):
+    """
+    SPA client-side routing fallback handler.
+    """
+    # Do not intercept API, docs, or OpenAPI schema endpoints
+    if (
+        full_path.startswith("api")
+        or full_path.startswith("docs")
+        or full_path.startswith("redoc")
+        or full_path == "openapi.json"
+    ):
+        return JSONResponse({"detail": "Not found"}, status_code=404)
+
+    target_file = FRONTEND_DIST / full_path
+    if FRONTEND_DIST.exists() and target_file.exists() and target_file.is_file():
+        return FileResponse(str(target_file))
+
+    index_file = FRONTEND_DIST / "index.html"
+    if FRONTEND_DIST.exists() and index_file.exists():
+        return FileResponse(str(index_file))
+
+    return JSONResponse({"detail": "Not found"}, status_code=404)
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

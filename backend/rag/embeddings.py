@@ -1,7 +1,24 @@
+import os
+import gc
 import time
 import logging
 from typing import List, Union, Optional
 import numpy as np
+
+# Optimize thread count to prevent memory spikes in 512MB RAM environments (Render Free Tier)
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+try:
+    import torch
+    torch.set_num_threads(1)
+    torch.set_grad_enabled(False)
+except Exception:
+    pass
+
 from sentence_transformers import SentenceTransformer
 
 from app.dependencies import get_settings
