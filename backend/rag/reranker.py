@@ -1,7 +1,7 @@
 import time
 import re
 import logging
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import numpy as np
 
 from app.schemas.rag import SourceChunk
