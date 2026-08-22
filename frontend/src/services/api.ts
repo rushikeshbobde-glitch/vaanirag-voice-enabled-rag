@@ -40,7 +40,11 @@ export const ragApi = {
 
   // Health check
   getHealth: async (): Promise<{ status: string; service: string; version: string; event: string }> => {
-    const res = await fetch(`${getApiBase()}/health`);
+    const res = await fetch(`${getApiBase()}/health`, {
+      method: 'GET',
+      mode: 'cors',
+      headers: { 'Accept': 'application/json' },
+    });
     if (!res.ok) throw new Error(`Health check failed: ${res.statusText}`);
     return res.json();
   },
@@ -49,7 +53,8 @@ export const ragApi = {
   submitQuery: async (payload: TextQueryPayload): Promise<RAGResponse> => {
     const res = await fetch(`${getApiBase()}/rag/query`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -63,7 +68,8 @@ export const ragApi = {
   submitVoiceQuery: async (payload: VoiceQueryPayload): Promise<RAGResponse> => {
     const res = await fetch(`${getApiBase()}/rag/voice-query`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
