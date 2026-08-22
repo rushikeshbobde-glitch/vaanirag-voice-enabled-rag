@@ -35,15 +35,7 @@ async def lifespan(app: FastAPI):
     Initializes embedding model and loads FAISS vector index readiness on server startup.
     """
     settings = get_settings()
-    logger.info("Initializing VaaniRAG: Multilingual Voice-Enabled Retrieval Intelligence...")
-
-    # 1. Warm up embedding model in memory
-    try:
-        load_embedding_model(settings.EMBEDDING_MODEL)
-    except Exception as e:
-        logger.warning(f"Error warming up embedding model: {e}")
-
-    # 2. Check and load pre-built index without automatic building on startup
+    # Check and load pre-built index from disk
     retriever = get_retriever()
     if not retriever.is_ready:
         logger.info("Checking for pre-built FAISS index on disk...")
@@ -57,7 +49,7 @@ async def lifespan(app: FastAPI):
     gc.collect()
 
     logger.info(
-        f"VaaniRAG Backend Online! Vector Index Ready: {retriever.is_ready} ({len(retriever.metadata)} chunks)"
+        f"VaaniRAG Backend Online! Vector Index Ready: {retriever.is_ready} ({len(retriever.metadata)} chunks). Embedding model will initialize on first query."
     )
     yield
     logger.info("VaaniRAG Backend shutting down...")

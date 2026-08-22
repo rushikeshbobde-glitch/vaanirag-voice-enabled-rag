@@ -38,15 +38,17 @@ def load_embedding_model(model_name: Optional[str] = None) -> SentenceTransforme
     name = model_name or settings.EMBEDDING_MODEL
 
     if _EMBEDDING_MODEL_INSTANCE is None:
-        logger.info(f"Loading multilingual embedding model: {name}")
+        logger.info(f"Loading embedding model: {name} (CPU mode)")
         start_t = time.perf_counter()
         try:
-            _EMBEDDING_MODEL_INSTANCE = SentenceTransformer(name)
+            _EMBEDDING_MODEL_INSTANCE = SentenceTransformer(name, device="cpu")
             elapsed = (time.perf_counter() - start_t) * 1000
             logger.info(f"Loaded embedding model in {elapsed:.2f}ms")
         except Exception as e:
             logger.warning(f"Error loading {name}: {e}. Falling back to 'all-MiniLM-L6-v2'")
-            _EMBEDDING_MODEL_INSTANCE = SentenceTransformer("all-MiniLM-L6-v2")
+            _EMBEDDING_MODEL_INSTANCE = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+        import gc
+        gc.collect()
 
     return _EMBEDDING_MODEL_INSTANCE
 
